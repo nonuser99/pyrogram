@@ -16,8 +16,6 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with Pyrogram.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List
-
 import asyncio
 import inspect
 
@@ -28,8 +26,7 @@ from pyrogram.methods.utilities.idle import idle
 class Run:
     def run(
         self: "pyrogram.Client",
-        use_qr: bool = False,
-        except_ids: List[int] = [],
+        coroutine=None
     ):
         """Start the client, idle the main script and finally stop the client.
 
@@ -37,16 +34,15 @@ class Run:
         :meth:`~pyrogram.Client.start`, :meth:`~pyrogram.idle` and :meth:`~pyrogram.Client.stop` in sequence.
         It makes running a single client less verbose.
 
+        In case a coroutine is passed as argument, runs the coroutine until it's completed and doesn't do any client
+        operation. This is almost the same as :py:obj:`asyncio.run` except for the fact that Pyrogram's ``run`` uses the
+        current event loop instead of a new one.
+
         If you want to run multiple clients at once, see :meth:`pyrogram.compose`.
 
         Parameters:
-            use_qr (``bool``, *optional*):
-                Use QR code authorization instead of the interactive prompt.
-                For new authorizations only.
-                Defaults to False.
-
-            except_ids (List of ``int``, *optional*):
-                List of already logged-in user IDs, to prevent logging in twice with the same user.
+            coroutine (``Coroutine``, *optional*):
+                Pass a coroutine to run it until it completes.
 
         Raises:
             ConnectionError: In case you try to run an already started client.
@@ -77,11 +73,14 @@ class Run:
         loop = asyncio.get_event_loop()
         run = loop.run_until_complete
 
-        if inspect.iscoroutinefunction(self.start):
-            run(self.start(use_qr=use_qr, except_ids=except_ids))
-            run(idle())
-            run(self.stop())
+        if coroutine is not None:
+            run(coroutine)
         else:
-            self.start(use_qr=use_qr, except_ids=except_ids)
-            run(idle())
-            self.stop()
+            if inspect.iscoroutinefunction(self.start):
+                run(self.start())
+                run(idle())
+                run(self.stop())
+            else:
+                self.start()
+                run(idle())
+                self.stop()
